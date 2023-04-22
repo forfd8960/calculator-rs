@@ -78,7 +78,7 @@ impl Scanner {
 
     fn scan_token(&mut self) -> Result<(), Error> {
         let ch = self.advance();
-        let mut rs = Err(Error::TokenNotSupported(format!("{} is not supported", ch)));
+        let mut rs = Ok(());
         match ch {
             '(' => self.add_token(TokenType::LeftParent("(".to_string())),
             ')' => self.add_token(TokenType::RightParent(")".to_string())),
@@ -90,13 +90,15 @@ impl Scanner {
             '.' => self.add_token(TokenType::Dot(".".to_string())),
             _ => {
                 if ch.is_digit(10) {
-                    match self.get_number_token() {
+                    rs = match self.get_number_token() {
                         Ok(tk) => {
                             self.add_token(tk);
-                            rs = Ok(())
+                            Ok(())
                         }
-                        Err(e) => rs = Err(e),
-                    }
+                        Err(e) => Err(e),
+                    };
+                } else {
+                    rs = Err(Error::TokenNotSupported(format!("{} is not supported", ch)));
                 }
             }
         }
