@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum TokenType {
     LeftParent(String),
     RightParent(String),
@@ -13,7 +13,7 @@ enum TokenType {
     Eof,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 enum Error {
     ParentNotMatch,
     ParseNumFailed(String),
@@ -171,4 +171,71 @@ impl Scanner {
 
 fn main() {
     println!("Hello, world!");
+}
+
+#[cfg(test)]
+mod tesst {
+    use crate::{Error, Scanner, TokenType};
+
+    #[test]
+    fn scan_tokens() {
+        let chars = vec!['+', '-', '*', '/'];
+        let mut scanner = Scanner::new(chars);
+        let rs = scanner.scan_tokens();
+        assert_eq!(rs, Ok(()));
+
+        assert_eq!(
+            scanner.tokens,
+            vec![
+                TokenType::Plus("+".to_string()),
+                TokenType::Minus("-".to_string()),
+                TokenType::Multiply("*".to_string()),
+                TokenType::Div("/".to_string()),
+                TokenType::Eof,
+            ]
+        );
+    }
+
+    #[test]
+    fn scan_num_tokens() {
+        let chars = vec!['+', '-', '*', '/', '1', '2', '.', '8'];
+        let mut scanner = Scanner::new(chars);
+        let rs = scanner.scan_tokens();
+        assert_eq!(rs, Ok(()));
+
+        /*
+        token: Plus("+")
+        token: Minus("-")
+        token: Multiply("*")
+        token: Div("/")
+        token: Num("12.8", 12.8)
+        token: Eof
+                */
+        for tk in &scanner.tokens {
+            println!("token: {:?}", tk);
+        }
+
+        assert_eq!(
+            scanner.tokens,
+            vec![
+                TokenType::Plus("+".to_string()),
+                TokenType::Minus("-".to_string()),
+                TokenType::Multiply("*".to_string()),
+                TokenType::Div("/".to_string()),
+                TokenType::Num("12.8".to_string(), 12.8 as f64),
+                TokenType::Eof,
+            ]
+        );
+    }
+
+    #[test]
+    fn scan_tokens_not_support_token() {
+        let chars = vec!['+', '-', '&', '/', '1', '2', '.', '8'];
+        let mut scanner = Scanner::new(chars);
+        let rs = scanner.scan_tokens();
+        assert_eq!(
+            rs,
+            Err(Error::TokenNotSupported("& is not supported".to_string()))
+        );
+    }
 }
