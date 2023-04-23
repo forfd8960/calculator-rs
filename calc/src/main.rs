@@ -1,3 +1,8 @@
+use std::{
+    collections::{HashMap, VecDeque},
+    ops::{Add, Mul},
+};
+
 #[derive(Debug, PartialEq)]
 enum TokenType {
     LeftParent(String),
@@ -6,16 +11,30 @@ enum TokenType {
     Minus(String),
     Multiply(String),
     Div(String),
-    Mod(String),
     Pow(String),
     Num(String, f64),
     Dot(String),
     Eof,
 }
 
+impl TokenType {
+    fn get_string(&self) -> String {
+        match self {
+            Self::LeftParent(v) | Self::RightParent(v) => *v,
+            Self::Plus(v) | Self::Minus(v) => *v,
+            Self::Multiply(v) | Self::Div(v) => *v,
+            Self::Pow(v) | Self::Num(v, _) => *v,
+            Self::Dot(v) => ".".to_string(),
+            _ => "".to_string(),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 enum Error {
-    ParentNotMatch,
+    TokenNotMatch,
+    InvalidExperssion,
+    InvalidOperator,
     ParseNumFailed(String),
     TokenNotSupported(String),
 }
@@ -30,9 +49,10 @@ struct Scanner {
 
 struct Execute {
     tokens: Vec<TokenType>,
-    result_stack: Vec<f64>,
-    op_stack: Vec<TokenType>,
-    current: i32,
+    result_stack: VecDeque<f64>, // push_back , pop_back
+    op_stack: VecDeque<String>,
+    current: usize,
+    priority_map: HashMap<String, u8>,
 }
 
 impl Execute {
@@ -40,13 +60,110 @@ impl Execute {
         Self {
             tokens: tokens,
             current: 0,
-            result_stack: Vec::<f64>::new(),
-            op_stack: Vec::<TokenType>::new(),
+            result_stack: VecDeque::<f64>::new(),
+            op_stack: VecDeque::<String>::new(),
+            priority_map: HashMap::from([
+                (")".to_string(), 6),
+                ("^".to_string(), 5),
+                ("*".to_string(), 4),
+                ("/".to_string(), 3),
+                ("+".to_string(), 2),
+                ("-".to_string(), 1),
+                ("(".to_string(), 0),
+            ]),
         }
     }
 
-    fn run(&self) -> Result<i64, Error> {
-        Ok(0)
+    fn compare_prec(&self, op1: String, op2: String) -> bool {
+        false
+    }
+
+    fn run(&mut self) -> Result<f64, Error> {
+        let tk_len = self.tokens.len();
+
+        loop {
+            let tk = self.tokens.get(self.current).unwrap();
+            match tk {
+                TokenType::Num(_, num) => {
+                    self.result_stack.push_back(*num);
+                    self.current += 1;
+                }
+
+                TokenType::LeftParent(_) => {
+                    self.op_stack.push_back(tk.get_string());
+                    self.current += 1;
+                }
+
+                TokenType::RightParent(_) => {
+                    self.pop_util_left_parent();
+                }
+                _ => {
+                    if let Some(_) = self.priority_map.get(&tk.get_string()) {
+                        self.op_stack.push_back(tk.get_string());
+                    } else {
+                        return Err(Error::TokenNotSupported(format!(
+                            "{} is not supported",
+                            tk.get_string()
+                        )));
+                    }
+                }
+            }
+        }
+
+        Ok(0.0)
+    }
+
+    fn pop_util_left_parent(&mut self) -> Result<(), Error> {
+        loop {
+            let tk = self.op_stack.pop_back();
+            if tk.is_none() {
+                return Err(Error::TokenNotMatch);
+            }
+            let op = tk.unwrap();
+
+            if op.as_str() == "(" {
+                break;
+            }
+
+            self.calculate(op);
+        }
+        self.current += 1;
+        Ok(())
+    }
+
+    fn calculate(&mut self, op: String) -> Result<(), Error> {
+        let num1 = self.result_stack.pop_back();
+        if num1.is_none() {
+            return Err(Error::InvalidExperssion);
+        }
+
+        let num2 = self.result_stack.pop_back();
+        if num2.is_none() {
+            return Err(Error::InvalidExperssion);
+        }
+
+        let (v1, v2) = (num1.unwrap(), num2.unwrap());
+        let mut rs = Ok(());
+        match op.as_str() {
+            "^" => {
+                self.result_stack.push_back(v1.powf(v2));
+            }
+            "*" => {
+                self.result_stack.push_back(v1.mul(v2));
+            }
+            "/" => {
+                self.result_stack.push_back(v1 / v2);
+            }
+            "+" => {
+                self.result_stack.push_back(v1.add(v2));
+            }
+            "-" => {
+                self.result_stack.push_back(v1 - v2);
+            }
+            _ => rs = Err(Error::InvalidOperator),
+        }
+
+        rs
     }
 }
 
@@ -68,7 +185,6 @@ impl Scanner {
             }
         }
 
-        self.add_token(TokenType::Eof);
         return Ok(());
     }
 
@@ -88,6 +204,7 @@ impl Scanner {
             '-' => self.add_token(TokenType::Minus("-".to_string())),
             '^' => self.add_token(TokenType::Pow("^".to_string())),
             '.' => self.add_token(TokenType::Dot(".".to_string())),
+            ' ' | '\r' | '\n' | '\t' => {}
             _ => {
                 if ch.is_digit(10) {
                     rs = match self.get_number_token() {
@@ -102,6 +219,7 @@ impl Scanner {
                 }
             }
         }
+
         rs
     }
 
@@ -165,8 +283,6 @@ impl Scanner {
         }
         Some(self.chars[(self.current + 1) as usize])
     }
-
-    fn parse_num(&mut self) {}
 }
 
 fn main() {
@@ -191,7 +307,6 @@ mod tesst {
                 TokenType::Minus("-".to_string()),
                 TokenType::Multiply("*".to_string()),
                 TokenType::Div("/".to_string()),
-                TokenType::Eof,
             ]
         );
     }
@@ -223,7 +338,6 @@ mod tesst {
                 TokenType::Multiply("*".to_string()),
                 TokenType::Div("/".to_string()),
                 TokenType::Num("12.8".to_string(), 12.8 as f64),
-                TokenType::Eof,
             ]
         );
     }
