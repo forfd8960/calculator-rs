@@ -80,6 +80,7 @@ impl Execute {
 
     fn run(&mut self) -> Result<f64, Error> {
         let tk_len = self.tokens.len();
+        let mut rs: Result<f64, Error> = Ok(0.0);
 
         loop {
             let tk = self.tokens.get(self.current).unwrap();
@@ -95,17 +96,14 @@ impl Execute {
                 }
 
                 TokenType::RightParent(_) => {
-                    self.pop_util_left_parent();
-                }
-                _ => {
-                    if let Some(_) = self.priority_map.get(&tk.get_string()) {
-                        self.op_stack.push_back(tk.get_string());
-                    } else {
-                        return Err(Error::TokenNotSupported(format!(
-                            "{} is not supported",
-                            tk.get_string()
-                        )));
+                    if let Err(e) = self.pop_util_left_parent() {
+                        rs = Err(e);
+                        return rs;
                     }
+                }
+
+                _ => {
+                    self.push_op(tk.get_string());
                 }
             }
         }
@@ -119,16 +117,54 @@ impl Execute {
             if tk.is_none() {
                 return Err(Error::TokenNotMatch);
             }
+
             let op = tk.unwrap();
 
             if op.as_str() == "(" {
                 break;
             }
 
-            self.calculate(op);
+            if let Err(e) = self.calculate(op) {
+                return Err(e);
+            }
         }
+
         self.current += 1;
         Ok(())
+    }
+
+    fn push_op(&mut self, tk: String) -> Result<(), Error> {
+        let op = tk;
+        if let Some(p) = self.priority_map.get(&op) {
+            // self.op_stack.push_back(op);
+
+            let current_op = || -> Option<&String> {
+                if self.op_stack.len() == 0 {
+                    return None;
+                }
+
+                self.op_stack.get(self.op_stack.len() - 1)
+            }();
+
+            if current_op.is_none() {
+                self.current += 1;
+                self.op_stack.push_back(op);
+                return Ok(());
+            }
+
+            let cur_op = current_op.unwrap();
+            let cur_op_pri = self.priority_map.get(cur_op).unwrap();
+            if cur_op_pri >= p {
+                self.calculate(*cur_op)?;
+                self.op_stack.pop_back();
+            }
+
+            self.current += 1;
+            self.op_stack.push_back(tk);
+            return Ok(());
+        }
+
+        Err(Error::TokenNotSupported(format!("{} is not supported", op)))
     }
 
     fn calculate(&mut self, op: String) -> Result<(), Error> {
