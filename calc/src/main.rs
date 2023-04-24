@@ -20,11 +20,11 @@ enum TokenType {
 impl TokenType {
     fn get_string(&self) -> String {
         match self {
-            Self::LeftParent(v) | Self::RightParent(v) => *v,
-            Self::Plus(v) | Self::Minus(v) => *v,
-            Self::Multiply(v) | Self::Div(v) => *v,
-            Self::Pow(v) | Self::Num(v, _) => *v,
-            Self::Dot(v) => ".".to_string(),
+            Self::LeftParent(v) | Self::RightParent(v) => v.clone(),
+            Self::Plus(v) | Self::Minus(v) => v.clone(),
+            Self::Multiply(v) | Self::Div(v) => v.clone(),
+            Self::Pow(v) | Self::Num(v, _) => v.clone(),
+            Self::Dot(_) => ".".to_string(),
             _ => "".to_string(),
         }
     }
@@ -80,7 +80,6 @@ impl Execute {
 
     fn run(&mut self) -> Result<f64, Error> {
         let tk_len = self.tokens.len();
-        let mut rs: Result<f64, Error> = Ok(0.0);
 
         loop {
             let tk = self.tokens.get(self.current).unwrap();
@@ -96,19 +95,24 @@ impl Execute {
                 }
 
                 TokenType::RightParent(_) => {
-                    if let Err(e) = self.pop_util_left_parent() {
-                        rs = Err(e);
-                        return rs;
-                    }
+                    self.pop_util_left_parent()?;
                 }
 
-                _ => {
-                    self.push_op(tk.get_string());
-                }
+                _ => self.push_op(tk.get_string())?,
+            };
+
+            if self.current >= tk_len {
+                break;
             }
         }
 
-        Ok(0.0)
+        self.pop_all_operators()?;
+
+        if let Some(v) = self.result_stack.pop_back() {
+            return Ok(v);
+        }
+
+        Err(Error::InvalidExperssion)
     }
 
     fn pop_util_left_parent(&mut self) -> Result<(), Error> {
@@ -138,33 +142,45 @@ impl Execute {
         if let Some(p) = self.priority_map.get(&op) {
             // self.op_stack.push_back(op);
 
-            let current_op = || -> Option<&String> {
+            let current_op = || -> &str {
                 if self.op_stack.len() == 0 {
-                    return None;
+                    return "";
                 }
 
-                self.op_stack.get(self.op_stack.len() - 1)
+                self.op_stack.get(self.op_stack.len() - 1).unwrap()
             }();
 
-            if current_op.is_none() {
+            if current_op == "" {
                 self.current += 1;
                 self.op_stack.push_back(op);
                 return Ok(());
             }
 
-            let cur_op = current_op.unwrap();
-            let cur_op_pri = self.priority_map.get(cur_op).unwrap();
+            let cur_op_pri = self.priority_map.get(current_op).unwrap();
             if cur_op_pri >= p {
-                self.calculate(*cur_op)?;
+                self.calculate(current_op.to_string())?;
                 self.op_stack.pop_back();
             }
 
             self.current += 1;
-            self.op_stack.push_back(tk);
+            self.op_stack.push_back(op);
             return Ok(());
         }
 
         Err(Error::TokenNotSupported(format!("{} is not supported", op)))
+    }
+
+    fn pop_all_operators(&mut self) -> Result<(), Error> {
+        if self.op_stack.len() == 0 {
+            return Ok(());
+        }
+
+        if let Some(op) = self.op_stack.pop_back() {
+            let rs = self.calculate(op);
+            return rs;
+        }
+
+        Ok(())
     }
 
     fn calculate(&mut self, op: String) -> Result<(), Error> {
