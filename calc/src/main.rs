@@ -74,10 +74,6 @@ impl Execute {
         }
     }
 
-    fn compare_prec(&self, op1: String, op2: String) -> bool {
-        false
-    }
-
     fn run(&mut self) -> Result<f64, Error> {
         let tk_len = self.tokens.len();
 
@@ -338,13 +334,29 @@ impl Scanner {
     }
 }
 
+/*
+Hello, calculator!
+calulcate result: -1023.73
+*/
 fn main() {
-    println!("Hello, world!");
+    println!("Hello, calculator!");
+    let expr = "(1 + 2) * (3 + 6) / 100 - 2^10";
+    let mut scanner = Scanner::new(expr.chars().into_iter().collect());
+    if let Err(e) = scanner.scan_tokens() {
+        println!("{:?}", e);
+        return;
+    }
+
+    let mut exeute = Execute::new(scanner.tokens);
+    match exeute.run() {
+        Ok(v) => println!("calulcate result: {}", v),
+        Err(e) => println!("calulcate error: {:?}", e),
+    }
 }
 
 #[cfg(test)]
-mod tesst {
-    use crate::{Error, Scanner, TokenType};
+mod test {
+    use crate::{Error, Execute, Scanner, TokenType};
 
     #[test]
     fn scan_tokens() {
@@ -404,5 +416,44 @@ mod tesst {
             rs,
             Err(Error::TokenNotSupported("& is not supported".to_string()))
         );
+    }
+
+    #[test]
+    fn execute_calculate_pow() {
+        let mut exet = Execute::new(vec![]);
+        exet.result_stack.push_back(2.0);
+        exet.result_stack.push_back(10.0);
+
+        let rs = exet.calculate("^".to_string());
+        assert_eq!(rs, Ok(()));
+
+        let r = exet.result_stack.pop_back();
+        assert_eq!(r, Some(1024.0));
+    }
+
+    #[test]
+    fn execute_calculate_div() {
+        let mut exet = Execute::new(vec![]);
+        exet.result_stack.push_back(2.0);
+        exet.result_stack.push_back(10.0);
+
+        let rs = exet.calculate("/".to_string());
+        assert_eq!(rs, Ok(()));
+
+        let r = exet.result_stack.pop_back();
+        assert_eq!(r, Some(0.2));
+    }
+
+    #[test]
+    fn execute_calculate_multiply() {
+        let mut exet = Execute::new(vec![]);
+        exet.result_stack.push_back(2.0);
+        exet.result_stack.push_back(10.0);
+
+        let rs = exet.calculate("*".to_string());
+        assert_eq!(rs, Ok(()));
+
+        let r = exet.result_stack.pop_back();
+        assert_eq!(r, Some(20.0));
     }
 }
