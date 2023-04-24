@@ -171,26 +171,23 @@ impl Execute {
     }
 
     fn pop_all_operators(&mut self) -> Result<(), Error> {
-        if self.op_stack.len() == 0 {
-            return Ok(());
-        }
-
-        if let Some(op) = self.op_stack.pop_back() {
-            let rs = self.calculate(op);
-            return rs;
+        while let Some(op) = self.op_stack.pop_back() {
+            if let Err(e) = self.calculate(op) {
+                return Err(e);
+            }
         }
 
         Ok(())
     }
 
     fn calculate(&mut self, op: String) -> Result<(), Error> {
-        let num1 = self.result_stack.pop_back();
-        if num1.is_none() {
+        let num2 = self.result_stack.pop_back();
+        if num2.is_none() {
             return Err(Error::InvalidExperssion);
         }
 
-        let num2 = self.result_stack.pop_back();
-        if num2.is_none() {
+        let num1 = self.result_stack.pop_back();
+        if num1.is_none() {
             return Err(Error::InvalidExperssion);
         }
 
@@ -204,7 +201,11 @@ impl Execute {
                 self.result_stack.push_back(v1.mul(v2));
             }
             "/" => {
-                self.result_stack.push_back(v1 / v2);
+                if v2 == 0.0 {
+                    rs = Err(Error::InvalidExperssion);
+                } else {
+                    self.result_stack.push_back(v1 / v2);
+                }
             }
             "+" => {
                 self.result_stack.push_back(v1.add(v2));
