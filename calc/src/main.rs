@@ -14,7 +14,6 @@ enum TokenType {
     Pow(String),
     Num(String, f64),
     Dot(String),
-    Eof,
 }
 
 impl TokenType {
@@ -168,9 +167,7 @@ impl Execute {
 
     fn pop_all_operators(&mut self) -> Result<(), Error> {
         while let Some(op) = self.op_stack.pop_back() {
-            if let Err(e) = self.calculate(op) {
-                return Err(e);
-            }
+            self.calculate(op)?;
         }
 
         Ok(())
@@ -340,7 +337,7 @@ calulcate result: -1023.73
 */
 fn main() {
     println!("Hello, calculator!");
-    let expr = "(1 + 2) * (3 + 6) / 100 - 2^10";
+    let expr = "(2 ^ 3 + 3 ^ 2) / ( 66 / 2) + 100";
     let mut scanner = Scanner::new(expr.chars().into_iter().collect());
     if let Err(e) = scanner.scan_tokens() {
         println!("{:?}", e);
@@ -442,10 +439,15 @@ mod test {
 
         let r = exet.result_stack.pop_back();
         assert_eq!(r, Some(0.2));
+
+        exet.result_stack.push_back(2.0);
+        exet.result_stack.push_back(0.0);
+        let rs = exet.calculate("/".to_string());
+        assert_eq!(rs, Err(Error::InvalidExperssion));
     }
 
     #[test]
-    fn execute_calculate_multiply() {
+    fn execute_calculate_multiply_plus() {
         let mut exet = Execute::new(vec![]);
         exet.result_stack.push_back(2.0);
         exet.result_stack.push_back(10.0);
@@ -455,5 +457,13 @@ mod test {
 
         let r = exet.result_stack.pop_back();
         assert_eq!(r, Some(20.0));
+
+        exet.result_stack.push_back(2.0);
+        exet.result_stack.push_back(10.0);
+        let rs = exet.calculate("+".to_string());
+        assert_eq!(rs, Ok(()));
+
+        let r = exet.result_stack.pop_back();
+        assert_eq!(r, Some(12.0));
     }
 }
