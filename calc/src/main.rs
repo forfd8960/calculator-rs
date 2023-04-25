@@ -1,5 +1,6 @@
 use std::{
     collections::{HashMap, VecDeque},
+    io,
     ops::{Add, Mul},
 };
 
@@ -331,23 +332,27 @@ impl Scanner {
     }
 }
 
-/*
-Hello, calculator!
-calulcate result: -1023.73
-*/
 fn main() {
     println!("Hello, calculator!");
-    let expr = "(2 ^ 3 + 3 ^ 2) / ( 66 / 2) + 100";
-    let mut scanner = Scanner::new(expr.chars().into_iter().collect());
-    if let Err(e) = scanner.scan_tokens() {
-        println!("{:?}", e);
-        return;
-    }
+    loop {
+        let mut input_expr = String::new();
+        let stdin = io::stdin();
+        match stdin.read_line(&mut input_expr) {
+            Ok(_) => {
+                let mut scanner = Scanner::new(input_expr.chars().into_iter().collect());
+                if let Err(e) = scanner.scan_tokens() {
+                    println!("{:?}", e);
+                    return;
+                }
 
-    let mut exeute = Execute::new(scanner.tokens);
-    match exeute.run() {
-        Ok(v) => println!("calulcate result: {}", v),
-        Err(e) => println!("calulcate error: {:?}", e),
+                let mut exeute = Execute::new(scanner.tokens);
+                match exeute.run() {
+                    Ok(v) => println!("expr={} calulcate result: {}", input_expr, v),
+                    Err(e) => println!("calulcate error: {:?}, expr={}", e, input_expr),
+                }
+            }
+            Err(e) => println!("bad user input: {}", e),
+        }
     }
 }
 
